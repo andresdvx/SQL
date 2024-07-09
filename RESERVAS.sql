@@ -4,33 +4,32 @@ BEGIN
 END
 GO
 CREATE PROCEDURE CrearReserva
-@HabitacionId INT,
-@FechaEntrada DATE,
-@FechaSalida DATE,
-@Cantidad INT
+    @HabitacionId INT,
+    @FechaEntrada DATE,
+    @FechaSalida DATE,
+    @Cantidad INT
 AS
 BEGIN
+SET XACT_ABORT ON -- ABORTA LA TRANSACCIÓN CUANDO DETECTA UN ERROR
+SET NOCOUNT ON -- EVITA MOSTRAR MENSAJES DE FILAS ( INSERT, DELETE, UPDATE) CUANDO SE CORRE EL PROCEDIMIENTO
+
     BEGIN TRY
 
-        BEGIN TRANSACTION
+        DECLARE @TRANSACTION VARCHAR(100) = 'transaction'
+        
+        BEGIN TRANSACTION @TRANSACTION
 
             IF NOT EXISTS (SELECT 1 FROM Habitaciones WHERE HabitacionID = @HabitacionId)
                 BEGIN
-                    RAISERROR('LA HABITACIÓN NO EXISTE', 16,1);
-                    ROLLBACK TRANSACTION;
-                    RETURN;
+                    RAISERROR('LA HABITACIÓN NO EXISTE', 16, 1);
                 END; 
-                
             
             DECLARE @Disponibilidad INT
             SELECT @Disponibilidad = (SELECT Disponibilidad FROM Habitaciones WHERE HabitacionID = @HabitacionId)
 
-
             IF @Disponibilidad < @Cantidad
                 BEGIN
-                    RAISERROR('NO HAY SUFICIENTE DISPONIBILIDAD EN LA HABITACIÓN', 16, 1);
-                    ROLLBACK TRANSACTION;
-                    RETURN;
+                    RAISERROR('NO HAY DISPONIBILIDAD EN LA HABITACIÓN', 16, 1);
                 END;
                     
             UPDATE Habitaciones SET Disponibilidad = @Disponibilidad - @Cantidad
@@ -39,8 +38,7 @@ BEGIN
             INSERT INTO Reservas (HabitacionID, FechaEntrada, FechaSalida, Cantidad)
             VALUES (@HabitacionId, @FechaEntrada, @FechaSalida, @Cantidad);
                     
-
-        COMMIT TRANSACTION;
+        COMMIT TRANSACTION @TRANSACTION;
 
     END TRY
     BEGIN CATCH
@@ -53,7 +51,7 @@ BEGIN
         @ERROR_SEVERITY = ERROR_SEVERITY(),
         @ERROR_STATUS = ERROR_STATE();
 
-        ROLLBACK TRANSACTION;
+        ROLLBACK TRANSACTION @TRANSACTION;
 
         RAISERROR(@ERROR_MESSAGE, @ERROR_SEVERITY, @ERROR_STATUS);
 
